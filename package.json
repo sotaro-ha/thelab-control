@@ -1,0 +1,27 @@
+{
+  "name": "the-lab-control",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "concurrently \"npm run dev\" \"npm --prefix server start\"",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.22.0",
+    "@mediapipe/pose": "~0.5.1675469404",
+    "@mediapipe/camera_utils": "~0.3.1675466862",
+    "@mediapipe/drawing_utils": "~0.3.1620248257"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.0.1",
+    "vite": "^5.2.0"
+  }
+}

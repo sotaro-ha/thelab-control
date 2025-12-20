@@ -1,0 +1,137 @@
+.home-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.content-wrapper {
+  max-width: 800px;
+  width: 100%;
+  background: white;
+  border-radius: 24px;
+  padding: 50px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.title {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.experience-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.experience-button {
+  width: 100%;
+  max-width: 400px;
+  padding: 25px 50px;
+  font-size: 2rem;
+  font-weight: bold;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: white;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.experience-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5);
+}
+
+.experience-button:active {
+  transform: translateY(0);
+}
+
+.explanation-button {
+  width: 100%;
+  max-width: 400px;
+  padding: 18px 40px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  font-family: 'Noto Sans JP', sans-serif;
+  color: #ff6b35;
+  background: white;
+  border: 3px solid #ff6b35;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.explanation-button:hover {
+  background: #ff6b35;
+  color: white;
+}
+
+.description-section {
+  padding: 35px;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-radius: 20px;
+}
+
+.description-box h2 {
+  font-size: 1.8rem;
+  color: #333;
+  margin-bottom: 20px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.description-box p {
+  font-size: 1.4rem;
+  color: #555;
+  line-height: 2;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 2.2rem;
+  }
+
+  .content-wrapper {
+    padding: 30px 20px;
+  }
+
+  .experience-button {
+    font-size: 1.6rem;
+    padding: 20px 40px;
+  }
+
+  .explanation-button {
+    font-size: 1.3rem;
+    padding: 15px 30px;
+  }
+
+  .description-box h2 {
+    font-size: 1.4rem;
+  }
+
+  .description-box p {
+    font-size: 1.2rem;
+  }
+}
