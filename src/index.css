@@ -30,10 +30,10 @@ rt {
 /* Navigation styling */
 .navigation {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   width: 100%;
-  padding: 10px 40px;
+  padding: 0;
   position: fixed;
   bottom: 15px;
   left: 0;
@@ -42,6 +42,8 @@ rt {
 }
 
 .nav-button {
+  position: fixed;
+  bottom: 15px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -54,6 +56,14 @@ rt {
   font-weight: 700;
   color: #333;
   transition: transform 0.2s;
+}
+
+.nav-button:first-child {
+  left: 40px;
+}
+
+.nav-button:last-child {
+  right: 40px;
 }
 
 .nav-button:hover {
@@ -79,7 +89,8 @@ rt {
   justify-content: center;
 }
 
-.nav-arrow {
-  font-size: 2rem;
-  font-weight: bold;
+.nav-arrow-icon {
+  width: 32px;
+  height: 32px;
+  color: #333;
 }

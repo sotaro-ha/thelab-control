@@ -18,6 +18,8 @@
   max-height: 100%;
   object-fit: contain;
   border-radius: 0;
+  transform: scaleX(-1);
+  /* 鏡像反転 */
 }
 
 .loading-overlay {
@@ -127,9 +129,11 @@
 
 .instruction-overlay p {
   color: white;
-  font-size: 1.4rem;
-  margin: 8px 0;
-  line-height: 1.8;
+  font-size: 2.2rem;
+  margin: 12px 0;
+  line-height: 1.6;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .countdown-overlay {
@@ -338,5 +342,50 @@
   .output-canvas {
     width: auto;
     height: 100vh;
+  }
+}
+
+.recording-status {
+  font-size: min(3rem, 6vh);
+  color: #ff4444;
+  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 15px 50px;
+  border-radius: 60px;
+  font-weight: bold;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: popIn 0.3s ease-out;
+}
+
+.rec-icon {
+  color: #ff0000;
+  animation: blink 1s infinite;
+  display: inline-block;
+}
+
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }

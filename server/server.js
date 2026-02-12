@@ -133,30 +133,26 @@ function calculateServoAngle(landmarks) {
   return Math.max(0, Math.min(180, angle))
 }
 
-// ロボットにコマンドを送信
+// ロボットにコマンドを送信 (ブロードキャストでID指定)
 function sendCommandToRobot(deviceId, angle) {
-  const device = discoveredDevices.get(deviceId)
-
-  if (!device) {
-    console.warn(`Device ${deviceId} not found`)
-    return false
-  }
-
   const command = {
+    module_type: 'actuator', // プロトコルに準拠
+    module_id: deviceId,     // device_id ではなく module_id
     action: 'set_servo',
     params: {
-      angle: angle
+      angle: parseInt(angle, 10) // 確実に整数として送信
     }
   }
 
   const message = JSON.stringify(command)
   const buffer = Buffer.from(message)
 
-  controlSocket.send(buffer, 0, buffer.length, device.controlPort, device.ip, (err) => {
+  // ブロードキャスト送信
+  controlSocket.send(buffer, 0, buffer.length, CONTROL_PORT, '255.255.255.255', (err) => {
     if (err) {
-      console.error(`Error sending to ${deviceId}:`, err)
+      console.error(`Error broadcasting to ${deviceId}:`, err)
     } else {
-      console.log(`🤖 Sent to ${deviceId}: angle=${angle}`)
+      // console.log(`🤖 Broadcast to ${deviceId}: angle=${angle}`)
     }
   })
 
@@ -173,7 +169,6 @@ function sendActuatorToDevices(actuator01, actuator02) {
   // マッピングが設定されている場合、マッピングされたデバイスのみに送信
   if (deviceMappings.size > 0) {
     for (const [deviceId, config] of deviceMappings) {
-      if (!discoveredDevices.has(deviceId)) continue
       const value = pickActuatorValue(config.hand, actuator01, actuator02)
       if (value === null) continue
       const clamped = Math.max(0, Math.min(1, value))
@@ -182,15 +177,14 @@ function sendActuatorToDevices(actuator01, actuator02) {
       sendCommandToRobot(deviceId, angle)
     }
   } else {
-    // マッピング未設定: 従来動作（平均値を全デバイスに送信）
-    const values = []
-    if (actuator01 !== null) values.push(actuator01)
-    if (actuator02 !== null) values.push(actuator02)
-    if (values.length === 0) return
-    const average = values.reduce((s, v) => s + v, 0) / values.length
-    const angle = Math.round(Math.max(0, Math.min(1, average)) * 180)
-    for (const deviceId of discoveredDevices.keys()) {
-      sendCommandToRobot(deviceId, angle)
+    // マッピング未設定: actuator_01/02 をそのまま送信
+    if (actuator01 !== null) {
+      const angle = Math.round(Math.max(0, Math.min(1, actuator01)) * 180)
+      sendCommandToRobot('actuator_01', angle)
+    }
+    if (actuator02 !== null) {
+      const angle = Math.round(Math.max(0, Math.min(1, 1 - actuator02)) * 180)
+      sendCommandToRobot('actuator_02', angle)
     }
   }
 }
@@ -432,12 +426,46 @@ app.post('/api/command/:deviceId', (req, res) => {
   }
 })
 
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const LOG_FILE = path.join(__dirname, 'feedback_log.json')
+
+// ... (existing code)
+
 // フィードバック送信
 app.post('/api/feedback', (req, res) => {
   try {
-    const { feedback } = req.body
-    console.log('📝 Received feedback:', feedback)
-    // TODO: データベースに保存
+    const { feedback, duration, age, gender } = req.body
+    console.log('📝 Received feedback:', feedback, 'Duration:', duration, 'Age:', age, 'Gender:', gender)
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      feedback: feedback,
+      duration_seconds: duration,
+      age: age || null,
+      gender: gender || null
+    }
+
+    // 既存のログを読み込む（なければ空配列）
+    let logs = []
+    if (fs.existsSync(LOG_FILE)) {
+      try {
+        const fileContent = fs.readFileSync(LOG_FILE, 'utf-8')
+        logs = JSON.parse(fileContent)
+      } catch (e) {
+        console.error('Error reading log file, starting new:', e)
+      }
+    }
+
+    logs.push(logEntry)
+
+    // 保存
+    fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2))
+
     res.json({ success: true })
   } catch (error) {
     console.error('Error in /api/feedback:', error)

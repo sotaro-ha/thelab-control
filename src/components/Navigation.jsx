@@ -1,3 +1,4 @@
+import { ArrowLeft, ArrowRight } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Navigation({ prevPath, nextPath, prevLabel = "もどる", nextLabel = "つぎへ", onNext }) {
@@ -23,7 +24,7 @@ export default function Navigation({ prevPath, nextPath, prevLabel = "もどる"
         disabled={!prevPath}
       >
         <div className="nav-icon">
-          <span className="nav-arrow">←</span>
+          <ArrowLeft className="nav-arrow-icon" weight="bold" aria-hidden="true" />
         </div>
         <span>{prevLabel}</span>
       </button>
@@ -34,7 +35,7 @@ export default function Navigation({ prevPath, nextPath, prevLabel = "もどる"
         disabled={!nextPath && !onNext}
       >
         <div className="nav-icon">
-          <span className="nav-arrow">→</span>
+          <ArrowRight className="nav-arrow-icon" weight="bold" aria-hidden="true" />
         </div>
         <span>{nextLabel}</span>
       </button>
