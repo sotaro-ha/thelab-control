@@ -78,6 +78,7 @@ function Motion() {
       setCountdownLabel('')
 
       if (!wsRef.current) {
+        console.warn('Cannot calibrate: RobotWebSocket is not connected')
         sendCaptureStatus(target, false)
         return
       }
@@ -122,6 +123,8 @@ function Motion() {
     if (!experienceState) return
 
     const { captureRequestId, captureTarget } = experienceState
+    console.log('UseEffect [experienceState]:', { captureRequestId, captureTarget, lastReq: lastCaptureRequestRef.current })
+
     if (!captureRequestId || captureRequestId === lastCaptureRequestRef.current) {
       return
     }
@@ -129,6 +132,7 @@ function Motion() {
     lastCaptureRequestRef.current = captureRequestId
 
     if (captureTarget === 'min' || captureTarget === 'max') {
+      console.log('Starting countdown for:', captureTarget)
       startCountdown(captureTarget)
     }
   }, [experienceState, startCountdown])
@@ -318,6 +322,9 @@ function Motion() {
 
       {countdown !== null && (
         <div className="countdown-overlay">
+          <div className="recording-status">
+            <span className="rec-icon">●</span> <Ruby rt="ろくがちゅう">録画中</Ruby>
+          </div>
           <div className="countdown-label">{countdownLabel}</div>
           <div className="countdown-number">{countdown}</div>
         </div>
@@ -432,7 +439,13 @@ function Motion() {
         {wsConnected && (
           <p className="connection-status">
             ロボットにつながっているよ
-            {isCalibrated && ' (キャリブレーション済み)'}
+            {isCalibrated && (
+              <>
+                {' ('}
+                キャリブレーション<Ruby rt="ず">済</Ruby>み
+                {')'}
+              </>
+            )}
           </p>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { ArrowLeft, ArrowRight } from '@phosphor-icons/react'
 import { useState } from 'react'
 import Ruby from './Ruby'
 import './SlideShow.css'
@@ -73,13 +74,9 @@ function SlideShow({ onClose }) {
         </div>
 
         <div className="slide-body">
-          {slide.image ? (
+          {slide.image && (
             <div className="slide-image">
               <img src={slide.image} alt="" />
-            </div>
-          ) : (
-            <div className="slide-placeholder">
-              <div className="placeholder-icon">🤖</div>
             </div>
           )}
           <p className="slide-description">{slide.description}</p>
@@ -92,7 +89,7 @@ function SlideShow({ onClose }) {
             disabled={currentSlide === 0}
           >
             <div className="nav-circle">
-              <div className="nav-arrow">←</div>
+              <ArrowLeft className="nav-arrow-icon" weight="bold" aria-hidden="true" />
             </div>
             <div className="nav-label">もどる</div>
           </button>
@@ -111,7 +108,7 @@ function SlideShow({ onClose }) {
             onClick={handleNext}
           >
             <div className="nav-circle">
-              <div className="nav-arrow">→</div>
+              <ArrowRight className="nav-arrow-icon" weight="bold" aria-hidden="true" />
             </div>
             <div className="nav-label">
               {currentSlide === slides.length - 1 ? 'とじる' : 'つぎへ'}

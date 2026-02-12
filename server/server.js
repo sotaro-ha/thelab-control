@@ -130,30 +130,26 @@ function calculateServoAngle(landmarks) {
   return Math.max(0, Math.min(180, angle))
 }
 
-// ロボットにコマンドを送信
+// ロボットにコマンドを送信 (ブロードキャストでID指定)
 function sendCommandToRobot(deviceId, angle) {
-  const device = discoveredDevices.get(deviceId)
-
-  if (!device) {
-    console.warn(`Device ${deviceId} not found`)
-    return false
-  }
-
   const command = {
+    module_type: 'actuator', // プロトコルに準拠
+    module_id: deviceId,     // device_id ではなく module_id
     action: 'set_servo',
     params: {
-      angle: angle
+      angle: parseInt(angle, 10) // 確実に整数として送信
     }
   }
 
   const message = JSON.stringify(command)
   const buffer = Buffer.from(message)
 
-  controlSocket.send(buffer, 0, buffer.length, device.controlPort, device.ip, (err) => {
+  // ブロードキャスト送信
+  controlSocket.send(buffer, 0, buffer.length, CONTROL_PORT, '255.255.255.255', (err) => {
     if (err) {
-      console.error(`Error sending to ${deviceId}:`, err)
+      console.error(`Error broadcasting to ${deviceId}:`, err)
     } else {
-      console.log(`🤖 Sent to ${deviceId}: angle=${angle}`)
+      // console.log(`🤖 Broadcast to ${deviceId}: angle=${angle}`)
     }
   })
 
@@ -274,21 +270,19 @@ wss.on('connection', (ws) => {
       }
 
       if (data.type === 'actuator') {
-        const values = []
+        // 個別のアクチュエータにコマンドを送信
         if (typeof data.actuator_01 === 'number') {
-          values.push(data.actuator_01)
-        }
-        if (typeof data.actuator_02 === 'number') {
-          values.push(data.actuator_02)
-        }
-        if (values.length === 0) {
-          return
+          // actuator_01 へ送信 (デバイスIDを指定してブロードキャスト)
+          // 角度に変換 (0.0-1.0 -> 0-180)
+          const angle = Math.round(Math.max(0, Math.min(1, data.actuator_01)) * 180)
+          sendCommandToRobot('actuator_01', angle)
         }
 
-        const average = values.reduce((sum, value) => sum + value, 0) / values.length
-        const normalized = Math.max(0, Math.min(1, average))
-        const angle = Math.round(normalized * 180)
-        sendCommandToAllDevices(angle)
+        if (typeof data.actuator_02 === 'number') {
+          // actuator_02 へ送信 (逆回転)
+          const angle = Math.round(Math.max(0, Math.min(1, 1 - data.actuator_02)) * 180)
+          sendCommandToRobot('actuator_02', angle)
+        }
       }
     } catch (error) {
       console.error('Error processing message:', error)
@@ -351,12 +345,46 @@ app.post('/api/command/:deviceId', (req, res) => {
   }
 })
 
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const LOG_FILE = path.join(__dirname, 'feedback_log.json')
+
+// ... (existing code)
+
 // フィードバック送信
 app.post('/api/feedback', (req, res) => {
   try {
-    const { feedback } = req.body
-    console.log('📝 Received feedback:', feedback)
-    // TODO: データベースに保存
+    const { feedback, duration, age, gender } = req.body
+    console.log('📝 Received feedback:', feedback, 'Duration:', duration, 'Age:', age, 'Gender:', gender)
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      feedback: feedback,
+      duration_seconds: duration,
+      age: age || null,
+      gender: gender || null
+    }
+
+    // 既存のログを読み込む（なければ空配列）
+    let logs = []
+    if (fs.existsSync(LOG_FILE)) {
+      try {
+        const fileContent = fs.readFileSync(LOG_FILE, 'utf-8')
+        logs = JSON.parse(fileContent)
+      } catch (e) {
+        console.error('Error reading log file, starting new:', e)
+      }
+    }
+
+    logs.push(logEntry)
+
+    // 保存
+    fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2))
+
     res.json({ success: true })
   } catch (error) {
     console.error('Error in /api/feedback:', error)
