@@ -17,6 +17,11 @@ app.use(express.json())
 // 検出されたデバイスを保存
 const discoveredDevices = new Map()
 
+// デバイスごとのマッピング設定
+// { hand: 'right'|'left'|'both', angleMin: 0, angleMax: 180, invert: false }
+// 空の場合は全デバイスに従来動作（平均値）で送信
+const deviceMappings = new Map()
+
 const experienceState = {
   step: 'explain',
   captures: {
@@ -55,7 +60,7 @@ discoverySocket.on('message', (msg, rinfo) => {
     // QubiLinkプロトコルのチェック
     if (data.proto === 'qubilink' && data.ver === 1) {
       if (data.type === 'announce' || data.type === 'reply') {
-        const deviceId = data.device_id
+        const deviceId = String(data.device_id)
         const deviceInfo = {
           id: deviceId,
           ip: data.ip || rinfo.address,
@@ -100,9 +105,7 @@ function sendDiscoveryRequest() {
   })
 }
 
-// 定期的にディスカバリーを実行
-setInterval(sendDiscoveryRequest, 5000)
-setTimeout(sendDiscoveryRequest, 1000) // 起動時にすぐ実行
+// ディスカバリーは手動（POST /api/discover）でのみ実行
 
 // ポーズデータからサーボ角度を計算
 function calculateServoAngle(landmarks) {
@@ -160,14 +163,62 @@ function sendCommandToRobot(deviceId, angle) {
   return true
 }
 
-// すべての検出されたデバイスにコマンドを送信
+// actuatorデータをマッピングに基づいて各デバイスに送信
+function sendActuatorToDevices(actuator01, actuator02) {
+  if (discoveredDevices.size === 0) {
+    console.warn('No devices discovered yet')
+    return
+  }
+
+  // マッピングが設定されている場合、マッピングされたデバイスのみに送信
+  if (deviceMappings.size > 0) {
+    for (const [deviceId, config] of deviceMappings) {
+      if (!discoveredDevices.has(deviceId)) continue
+      const value = pickActuatorValue(config.hand, actuator01, actuator02)
+      if (value === null) continue
+      const clamped = Math.max(0, Math.min(1, value))
+      const t = config.invert ? 1 - clamped : clamped
+      const angle = Math.round(config.angleMin + t * (config.angleMax - config.angleMin))
+      sendCommandToRobot(deviceId, angle)
+    }
+  } else {
+    // マッピング未設定: 従来動作（平均値を全デバイスに送信）
+    const values = []
+    if (actuator01 !== null) values.push(actuator01)
+    if (actuator02 !== null) values.push(actuator02)
+    if (values.length === 0) return
+    const average = values.reduce((s, v) => s + v, 0) / values.length
+    const angle = Math.round(Math.max(0, Math.min(1, average)) * 180)
+    for (const deviceId of discoveredDevices.keys()) {
+      sendCommandToRobot(deviceId, angle)
+    }
+  }
+}
+
+// マッピングに応じた actuator 値を選択
+function pickActuatorValue(mapping, actuator01, actuator02) {
+  if (mapping === 'right') return actuator01
+  if (mapping === 'left') return actuator02
+  // 'both': 平均
+  const values = []
+  if (actuator01 !== null) values.push(actuator01)
+  if (actuator02 !== null) values.push(actuator02)
+  if (values.length === 0) return null
+  return values.reduce((s, v) => s + v, 0) / values.length
+}
+
+// poseデータ（キャリブレーション前）を全デバイスに送信
 function sendCommandToAllDevices(angle) {
   if (discoveredDevices.size === 0) {
     console.warn('No devices discovered yet')
     return
   }
 
-  for (const [deviceId] of discoveredDevices) {
+  const targetIds = deviceMappings.size > 0
+    ? [...deviceMappings.keys()].filter(id => discoveredDevices.has(id))
+    : [...discoveredDevices.keys()]
+
+  for (const deviceId of targetIds) {
     sendCommandToRobot(deviceId, angle)
   }
 }
@@ -274,21 +325,10 @@ wss.on('connection', (ws) => {
       }
 
       if (data.type === 'actuator') {
-        const values = []
-        if (typeof data.actuator_01 === 'number') {
-          values.push(data.actuator_01)
-        }
-        if (typeof data.actuator_02 === 'number') {
-          values.push(data.actuator_02)
-        }
-        if (values.length === 0) {
-          return
-        }
-
-        const average = values.reduce((sum, value) => sum + value, 0) / values.length
-        const normalized = Math.max(0, Math.min(1, average))
-        const angle = Math.round(normalized * 180)
-        sendCommandToAllDevices(angle)
+        const a01 = typeof data.actuator_01 === 'number' ? data.actuator_01 : null
+        const a02 = typeof data.actuator_02 === 'number' ? data.actuator_02 : null
+        if (a01 === null && a02 === null) return
+        sendActuatorToDevices(a01, a02)
       }
     } catch (error) {
       console.error('Error processing message:', error)
@@ -304,24 +344,65 @@ wss.on('connection', (ws) => {
   })
 })
 
-// 定期的に古いデバイスを削除（30秒以上応答がない場合）
+// 定期的に古いデバイスを削除（5分以上応答がない場合）
 setInterval(() => {
   const now = Date.now()
   for (const [deviceId, device] of discoveredDevices) {
-    if (now - device.lastSeen > 30000) {
+    if (now - device.lastSeen > 5 * 60 * 1000) {
       console.log(`❌ Device timeout: ${deviceId}`)
       discoveredDevices.delete(deviceId)
+      deviceMappings.delete(deviceId)
     }
   }
-}, 10000)
+}, 60000)
 
 // REST APIエンドポイント
 
 // デバイスリストを取得
 app.get('/api/devices', (req, res) => {
-  res.json({
-    devices: Array.from(discoveredDevices.values())
-  })
+  const devices = Array.from(discoveredDevices.values()).map(device => ({
+    ...device,
+    mapping: deviceMappings.get(device.id) || null
+  }))
+  res.json({ devices })
+})
+
+// デバイスのマッピング設定を更新
+app.post('/api/devices/:deviceId/mapping', (req, res) => {
+  const { deviceId } = req.params
+  const { mapping } = req.body
+
+  // mapping が null / 'none' → クリア
+  if (mapping === null || mapping === 'none') {
+    deviceMappings.delete(deviceId)
+    console.log(`⬜ Device mapping cleared: ${deviceId}`)
+    return res.json({ success: true })
+  }
+
+  // mapping がオブジェクトの場合 { hand, angleMin, angleMax, invert }
+  if (typeof mapping === 'object') {
+    if (!['right', 'left', 'both'].includes(mapping.hand)) {
+      return res.status(400).json({ success: false, error: 'Invalid hand (right|left|both)' })
+    }
+    const config = {
+      hand: mapping.hand,
+      angleMin: typeof mapping.angleMin === 'number' ? Math.max(0, Math.min(180, mapping.angleMin)) : 0,
+      angleMax: typeof mapping.angleMax === 'number' ? Math.max(0, Math.min(180, mapping.angleMax)) : 180,
+      invert: Boolean(mapping.invert),
+    }
+    deviceMappings.set(deviceId, config)
+    console.log(`🖐 Device mapping set: ${deviceId} ->`, config)
+    return res.json({ success: true })
+  }
+
+  // mapping が文字列の場合（後方互換）
+  if (['right', 'left', 'both'].includes(mapping)) {
+    deviceMappings.set(deviceId, { hand: mapping, angleMin: 0, angleMax: 180, invert: false })
+    console.log(`🖐 Device mapping set: ${deviceId} -> ${mapping}`)
+    return res.json({ success: true })
+  }
+
+  res.status(400).json({ success: false, error: 'Invalid mapping' })
 })
 
 // 手動でディスカバリーを実行

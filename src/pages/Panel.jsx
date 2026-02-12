@@ -27,7 +27,12 @@ function Panel() {
   const location = useLocation()
   const [experienceState, setExperienceState] = useState(defaultState)
   const [wsConnected, setWsConnected] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(true)
+  const [isRecording, setIsRecording] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const [interimTranscript, setInterimTranscript] = useState('')
   const wsRef = useRef(null)
+  const recognitionRef = useRef(null)
   const resetRequestedRef = useRef(false)
 
   const sendMessage = useCallback((payload) => {
@@ -44,6 +49,9 @@ function Panel() {
         reset: true
       }
     })
+    setTranscript('')
+    setInterimTranscript('')
+    setIsRecording(false)
   }, [sendMessage])
 
   useEffect(() => {
@@ -84,6 +92,84 @@ function Panel() {
       ws.close()
     }
   }, [])
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setSpeechSupported(false)
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'ja-JP'
+    recognition.interimResults = true
+    recognition.continuous = true
+
+    recognition.onstart = () => {
+      setIsRecording(true)
+    }
+
+    recognition.onend = () => {
+      setIsRecording(false)
+      setInterimTranscript('')
+    }
+
+    recognition.onerror = () => {
+      setIsRecording(false)
+      setInterimTranscript('')
+    }
+
+    recognition.onresult = (event) => {
+      let interim = ''
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          setTranscript((prev) => {
+            const nextText = result[0].transcript.trim()
+            return `${prev}${prev && nextText ? ' ' : ''}${nextText}`
+          })
+        } else {
+          interim += result[0].transcript
+        }
+      }
+
+      setInterimTranscript(interim.trim())
+    }
+
+    recognitionRef.current = recognition
+
+    return () => {
+      recognition.stop()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (experienceState.step !== 'feedback' && recognitionRef.current && isRecording) {
+      recognitionRef.current.stop()
+    }
+    if (experienceState.step !== 'feedback') {
+      setTranscript('')
+      setInterimTranscript('')
+    }
+  }, [experienceState.step, isRecording])
+
+  const toggleRecording = () => {
+    if (!speechSupported || !recognitionRef.current) {
+      return
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop()
+      return
+    }
+
+    try {
+      recognitionRef.current.start()
+    } catch (error) {
+      // ignore repeated start errors
+    }
+  }
 
   const currentStepIndex = useMemo(() => {
     const index = steps.findIndex((step) => step.id === experienceState.step)
@@ -150,37 +236,43 @@ function Panel() {
   const stepCopy = useMemo(() => {
     if (!wsConnected) {
       return {
-        now: '準備中です',
-        todo: 'そのままお待ちください'
+        now: <><Ruby rt="じゅんび">準備</Ruby><Ruby rt="ちゅう">中</Ruby>です</>,
+        todo: <>そのままお<Ruby rt="ま">待</Ruby>ちください</>
       }
     }
 
     const copy = {
       explain: {
-        now: '説明を表示しています',
-        todo: '内容を確認できたら「次へ」を押してください'
+        now: <><Ruby rt="せつめい">説明</Ruby>を<Ruby rt="ひょうじ">表示</Ruby>しています</>,
+        todo: <><Ruby rt="ないよう">内容</Ruby>を<Ruby rt="かくにん">確認</Ruby>できたら「つぎへ」を<Ruby rt="お">押</Ruby>してください</>
       },
       capture_min: {
-        now: experienceState.captures.min ? '縮める撮影が完了しました' : '体を縮める動きを撮影中です',
+        now: experienceState.captures.min
+          ? <>⏹ <Ruby rt="ちぢ">縮</Ruby>める<Ruby rt="さつえい">撮影</Ruby>が<Ruby rt="かんりょう">完了</Ruby>しました</>
+          : <>📸 <Ruby rt="からだ">体</Ruby>を<Ruby rt="ちぢ">縮</Ruby>める<Ruby rt="うご">動</Ruby>きを<Ruby rt="さつえい">撮影</Ruby><Ruby rt="ちゅう">中</Ruby>です</>,
         todo: experienceState.captures.min
-          ? '次へで次の撮影に進みます'
-          : '体を小さくして、3・2・1の合図まで待ってください'
+          ? <>つぎへで<Ruby rt="つぎ">次</Ruby>の<Ruby rt="さつえい">撮影</Ruby>に<Ruby rt="すす">進</Ruby>みます</>
+          : <><Ruby rt="からだ">体</Ruby>を<Ruby rt="ちい">小</Ruby>さくして、3・2・1の<Ruby rt="あいず">合図</Ruby>まで<Ruby rt="ま">待</Ruby>ってください</>
       },
       capture_max: {
-        now: experienceState.captures.max ? '広げる撮影が完了しました' : '体を広げる動きを撮影中です',
+        now: experienceState.captures.max
+          ? <>⏹ <Ruby rt="ひろ">広</Ruby>げる<Ruby rt="さつえい">撮影</Ruby>が<Ruby rt="かんりょう">完了</Ruby>しました</>
+          : <>📸 <Ruby rt="からだ">体</Ruby>を<Ruby rt="ひろ">広</Ruby>げる<Ruby rt="うご">動</Ruby>きを<Ruby rt="さつえい">撮影</Ruby><Ruby rt="ちゅう">中</Ruby>です</>,
         todo: experienceState.captures.max
-          ? '次へで信号送信へ進みます'
-          : '体を大きく広げて、3・2・1の合図まで待ってください'
+          ? <>つぎへで<Ruby rt="しんごう">信号</Ruby><Ruby rt="そうしん">送信</Ruby>へ<Ruby rt="すす">進</Ruby>みます</>
+          : <><Ruby rt="からだ">体</Ruby>を<Ruby rt="おお">大</Ruby>きく<Ruby rt="ひろ">広</Ruby>げて、3・2・1の<Ruby rt="あいず">合図</Ruby>まで<Ruby rt="ま">待</Ruby>ってください</>
       },
       robot: {
-        now: experienceState.robotEnabled ? 'ロボットへ信号を送信中です' : '信号送信の準備中です',
+        now: experienceState.robotEnabled
+          ? <>📡 ロボットへ<Ruby rt="しんごう">信号</Ruby>を<Ruby rt="そうしん">送信</Ruby><Ruby rt="ちゅう">中</Ruby>です</>
+          : <>⏳ <Ruby rt="しんごう">信号</Ruby><Ruby rt="そうしん">送信</Ruby>の<Ruby rt="じゅんび">準備</Ruby><Ruby rt="ちゅう">中</Ruby>です</>,
         todo: experienceState.robotEnabled
-          ? '体を動かしてロボットを操作してください'
-          : '次へで信号送信を開始します'
+          ? <><Ruby rt="からだ">体</Ruby>を<Ruby rt="うご">動</Ruby>かしてロボットを<Ruby rt="そうさ">操作</Ruby>してください</>
+          : <>つぎへで<Ruby rt="しんごう">信号</Ruby><Ruby rt="そうしん">送信</Ruby>を<Ruby rt="かいし">開始</Ruby>します</>
       },
       feedback: {
-        now: '感想を受け付けています',
-        todo: '音声で感想を伝えてください'
+        now: <>🎤 <Ruby rt="かんそう">感想</Ruby>を<Ruby rt="う">受</Ruby>け<Ruby rt="つ">付</Ruby>けています</>,
+        todo: <><Ruby rt="おんせい">音声</Ruby>で<Ruby rt="かんそう">感想</Ruby>を<Ruby rt="つた">伝</Ruby>えてください</>
       }
     }
 
@@ -247,12 +339,38 @@ function Panel() {
               onClick={triggerCapture}
               disabled={!wsConnected}
             >
-              {experienceState.step === 'capture_min'
-                ? (experienceState.captures.min ? 'もう一度録画する' : '録画開始')
-                : (experienceState.captures.max ? 'もう一度録画する' : '録画開始')}
+              {(experienceState.step === 'capture_min' ? experienceState.captures.min : experienceState.captures.max)
+                ? <>🔄 もう<Ruby rt="いちど">一度</Ruby><Ruby rt="ろくが">録画</Ruby>する</>
+                : <>🔴 <Ruby rt="ろくが">録画</Ruby><Ruby rt="かいし">開始</Ruby></>}
             </button>
           )}
         </div>
+
+        {experienceState.step === 'feedback' && (
+          <div className="panel-voice">
+            <button
+              className={`panel-mic ${isRecording ? 'recording' : ''}`}
+              onClick={toggleRecording}
+              disabled={!speechSupported || !wsConnected}
+            >
+              <span className="panel-mic-inner" />
+            </button>
+            <div className="panel-voice-text">
+              <div className="panel-voice-label">
+                {speechSupported
+                  ? (isRecording
+                    ? <>🔴 <Ruby rt="ろくおん">録音</Ruby><Ruby rt="ちゅう">中</Ruby>...</>
+                    : <>🎤 マイクを<Ruby rt="お">押</Ruby>して<Ruby rt="はな">話</Ruby>してください</>)
+                  : <>このブラウザでは<Ruby rt="おんせい">音声</Ruby><Ruby rt="にゅうりょく">入力</Ruby>が<Ruby rt="つか">使</Ruby>えません</>}
+              </div>
+              <div className="panel-transcript">
+                {transcript || interimTranscript
+                  ? `${transcript}${interimTranscript ? ` ${interimTranscript}` : ''}`
+                  : '...'}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="panel-actions">

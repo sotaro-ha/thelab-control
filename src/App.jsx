@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Motion from './pages/Motion'
 import Control from './pages/Control'
 import Panel from './pages/Panel'
+import Admin from './pages/Admin'
 
 const IDLE_TIMEOUT = 2 * 60 * 1000 // 2 minutes in milliseconds
 
@@ -23,7 +24,8 @@ function App() {
       location.pathname !== '/' &&
       location.pathname !== '/control' &&
       location.pathname !== '/panel' &&
-      location.pathname !== '/motion'
+      location.pathname !== '/motion' &&
+      location.pathname !== '/admin'
     ) {
       idleTimerRef.current = setTimeout(() => {
         navigate('/')
@@ -97,6 +99,7 @@ function App() {
       <Route path="/control" element={<Control />} />
       <Route path="/panel" element={<Panel />} />
       <Route path="/motion" element={<Motion />} />
+      <Route path="/admin" element={<Admin />} />
     </Routes>
   )
 }
